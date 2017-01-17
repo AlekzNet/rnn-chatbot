@@ -40,17 +40,8 @@ cmd:option('-batchnorm', 1)
 
 -- Optimization options
 cmd:option('-max_epochs', 50)
---cmd:option('-learning_rate', 0.000012)
--- cmd:option('-learning_rate', 1.20e-04)
- -- cmd:option('-learning_rate', 3.5e-05)
 -- cmd:option('-learning_rate', 1.0e-04)
 -- cmd:option('-learning_rate', 1.0e-03)
--- cmd:option('-learning_rate', 0.001)
--- cmd:option('-learning_rate', 1.25e-04)
--- cmd:option('-learning_rate', 6.25e-05)
--- cmd:option('-learning_rate', 3.125e-05)
--- cmd:option('-learning_rate', 1.5625e-05)
--- cmd:option('-learning_rate', 7.8125e-06)
 cmd:option('-learning_rate', 3.90625e-06)
 cmd:option('-grad_clip', 5)
 cmd:option('-lr_decay_every', 5)
@@ -139,8 +130,6 @@ print('number of parameters in the model: ' .. params:nElement())
 print('grad_params:norm', grad_params:norm())
 print('params:norm', params:norm())
 print('grad/param norm',  grad_params:norm() / params:norm())
---print('grad_params', grad_params)
--- print('params', params)
 
 local crit = nn.CrossEntropyCriterion():type(dtype)
 
@@ -232,19 +221,14 @@ for i = start_i + 1, num_iterations do
 
   -- Take a gradient step and maybe print
   -- Note that adam returns a singleton array of losses
--- print "before adam"
   local mytimer = torch.Timer()
   local _, loss = optim.adam(f, params, optim_config)
--- print "after adam"
   table.insert(train_loss_history, loss[1])
   local elapsed = mytimer:time().real
   if opt.print_every > 0 and i % opt.print_every == 0 then
     local float_epoch = i / num_train + 1
---    local msg = 'Epoch %.4f / %d, i = %d / %d, loss = %f, grad = %f, time = %f'
 --    fifo:push(loss[1])
---    local msg = 'Epoch %.4f / %d, i = %d / %d, loss = %f, avg_loss = %f, %s, time = %f'
     local msg = 'Epoch %.4f / %d, i = %d / %d, loss = %f, time = %f'
---    local args = {msg, float_epoch, opt.max_epochs, i, num_iterations, loss[1],fifo:avg(),fifo:dyn() , elapsed}
     local args = {msg, float_epoch, opt.max_epochs, i, num_iterations, loss[1], elapsed}
     print(string.format(unpack(args)))
   end
