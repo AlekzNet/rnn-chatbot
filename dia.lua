@@ -2,21 +2,21 @@ Dia = {}
 
 function Dia:Create(n)
 
-	local t = {}
 	-- entry table
-  	t._et = {}
-	t._maxlen = n
-	
+  	self._et = {}
+	self._maxlen = n
+	return self	
+end
 
-  function t:maxlen()
+  function Dia:maxlen()
 	return self._maxlen
   end
 
-  function t:curlen()
+  function Dia:curlen()
 	return #self._et
   end
 
-  function t:setlen(n)
+  function Dia:setlen(n)
 	if n >= self._maxlen or n >= #self._et then
 		self._maxlen = n
 	else
@@ -27,7 +27,7 @@ function Dia:Create(n)
 	end
   end
 
-  function t:push(v)
+  function Dia:push(v)
 	if v then
 		table.insert(self._et, v)	
 		if table.getn(self._et) > self._maxlen then
@@ -36,14 +36,11 @@ function Dia:Create(n)
 	end
   end
   
-  function t:dia()
+  function Dia:dia()
   	return table.concat(self._et,"\n")
   end
   
-  function t:clear()
+  function Dia:clear()
   	self._et = {}
   end
   
-  return t
-end
-
