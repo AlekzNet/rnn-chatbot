@@ -85,6 +85,7 @@ while true do
 		dia:push(sample)
 		print(sample)
 		model:resetStates()
---		model:clearState()
+		model:clearState()
+		collectgarbage()
 	end
 end

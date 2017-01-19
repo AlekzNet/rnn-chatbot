@@ -231,6 +231,7 @@ for i = start_i + 1, num_iterations do
     local msg = 'Epoch %.4f / %d, i = %d / %d, loss = %f, time = %f'
     local args = {msg, float_epoch, opt.max_epochs, i, num_iterations, loss[1], elapsed}
     print(string.format(unpack(args)))
+    collectgarbage()
   end
 
   -- Maybe save a checkpoint
