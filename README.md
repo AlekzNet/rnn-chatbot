@@ -1,3 +1,57 @@
+Tweaked https://github.com/jcjohnson/torch-rnn to implement line-by-line based chatbot. Since I made too many changes, it's not compatible with the original, hence I created a separate repository.  In comparison to the original torch-rnn
+
+####removed:
+
+* creation and using validation and test sets
+* modelreset and modelclear before saving the model to disk
+
+####replaced:
+
+* char by char (`..`) concatenation during sampling with table concatenation
+* "xxx byte limitation" sampling with "until new line" one
+* creating the .h5 conversion table based on the current .txt file with a universal one (ASCII only)
+
+
+####added:
+
+* GRU cells from https://github.com/guillitte/torch-rnn
+* GridGRU (or GridLSTM) from https://github.com/guillitte/torch-rnn/tree/Dev
+* Server implementation from https://github.com/jcjohnson/torch-rnn/pull/61 (requires https://github.com/kernelsauce/turbo)
+* Dia object, that seeds the NN with the last "n" conversation lines
+* Interactive dialogue
+* Command structure to change parameters "on the fly"
+* Reset program to reset the saved models in order to either train them with a different batch/wondow size or for sampling
+* Timer (to show time per training iteration)
+
+##Examples:
+
+```txt
+th mysample.lua -temperature 0.7 -checkpoint cp_3x1000-0.1-1_7.8125e-06_14760.t7.reset.t7
+Loading 	cp_3x1000-0.1-1_7.8125e-06_14760.t7.reset.t7	
+Loaded
+Me: What is your name?
+NN: My name is Lancelot.
+Me: Nice name. And with a history. Or... are you THAT Lancelot?
+NN: Yes, my lady.
+Me: Wow...
+. . .
+Me: ;curlen
+The current length is 5, the maximum length is 16
+Me: ;setlen=5
+The dialogue length is set to 5
+Me: ;temp=0.6
+The temp is set to 0.6
+Me: ;reset
+Reset
+Me: Hello
+NN: I'm asking you to leave.
+Me: Why?
+NN: Well, I'm not a woman.
+Me: Nobody's perfect.
+```
+
+Original Readme from https://github.com/jcjohnson/torch-rnn
+-------------
 # torch-rnn
 torch-rnn provides high-performance, reusable RNN and LSTM modules for torch7, and uses these modules for character-level
 language modeling similar to [char-rnn](https://github.com/karpathy/char-rnn).
@@ -146,28 +200,28 @@ to run in OpenCL mode add the flag `-gpu_backend opencl`.
 
 There are more flags you can use to configure sampling; [read about them here](doc/flags.md#sampling).
 
-# Benchmarks
-To benchmark `torch-rnn` against `char-rnn`, we use each to train LSTM language models for the tiny-shakespeare dataset
-with 1, 2 or 3 layers and with an RNN size of 64, 128, 256, or 512. For each we use a minibatch size of 50, a sequence 
-length of 50, and no dropout. For each model size and for both implementations, we record the forward/backward times and 
-GPU memory usage over the first 100 training iterations, and use these measurements to compute the mean time and memory 
-usage.
+## Step 4 (optional): Serve samples from an HTTP server
+If you want to generate new text on demand without loading the model for every sample, you can use the script `server.lua`. 
+You will need to install [Turbo](https://github.com/kernelsauce/turbo) framework first:
+```bash
+luarocks install turbo
+```
 
-All benchmarks were run on a machine with an Intel i7-4790k CPU, 32 GB main memory, and a Titan X GPU.
+Check [Turbo installation manual](https://github.com/kernelsauce/turbo#installation) in case of problems.
+Then run the server:
 
-Below we show the forward/backward times for both implementations, as well as the mean speedup of `torch-rnn` over 
-`char-rnn`. We see that `torch-rnn` is faster than `char-rnn` at all model sizes, with smaller models giving a larger
-speedup; for a single-layer LSTM with 128 hidden units, we achieve a **1.9x speedup**; for larger models we achieve about
-a 1.4x speedup.
+```bash
+th server.lua -checkpoint cv/checkpoint_10000.t7 -port 8888
+```
 
-<img src='imgs/lstm_time_benchmark.png' width="800px">
+Now you can generate new sample by sending an HTTP GET request:
+```bash
+curl -G -d "length=100&temperature=0.9" http://localhost:8888/sample
+```
 
-Below we show the GPU memory usage for both implementations, as well as the mean memory saving of `torch-rnn` over
-`char-rnn`. Again `torch-rnn` outperforms `char-rnn` at all model sizes, but here the savings become more significant for
-larger models: for models with 512 hidden units, we use **7x less memory** than `char-rnn`.
-
-<img src='imgs/lstm_memory_benchmark.png' width="800px">
+The following command line arguments of `sample.lua` remain unchanged for `server.lua`: 
+`-checkpoint`, `-gpu`, `-gpu_backend`, `-verbose`. `-port` argument configures the HTTP port.
+The other arguments (`length`, `start_text`, `temperature` and `sample`) should be passed as GET parameters.
 
 
-# TODOs
-- Get rid of Python / JSON / HDF5 dependencies?
+
