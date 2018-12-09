@@ -110,8 +110,9 @@ luarocks install optim
 luarocks install lua-cjson
 
 # We need to install torch-hdf5 from GitHub
-git clone https://github.com/deepmind/torch-hdf5
+git clone https://github.com/anibali/torch-hdf5.git
 cd torch-hdf5
+git checkout hdf5-1.10 
 luarocks make hdf5-0-0.rockspec
 ```
 
