@@ -13,12 +13,14 @@ local unpack = unpack or table.unpack
 local cmd = torch.CmdLine()
 
 -- Dataset options
+cmd:option('-online',false,'boolean option')
+cmd:option('-outfile',"")
 -- cmd:option('-input_h5', 'data/alldia.h5')
 cmd:option('-input_h5', 'data/alldia-curr.h5')
 cmd:option('-input_json', 'data/ascii.json')
--- cmd:option('-batch_size', 20)
+cmd:option('-batch_size', 20)
 -- cmd:option('-batch_size', 572)
-cmd:option('-batch_size', 398)
+-- cmd:option('-batch_size', 398)
 -- cmd:option('-batch_size', 1)
 cmd:option('-seq_length', 300)
 -- cmd:option('-seq_length', 40)
@@ -42,22 +44,22 @@ cmd:option('-batchnorm', 1)
 cmd:option('-max_epochs', 50)
 -- cmd:option('-learning_rate', 1.0e-04)
 -- cmd:option('-learning_rate', 1.0e-03)
-cmd:option('-learning_rate', 3.90625e-06)
+cmd:option('-learning_rate', 5.0e-06)
 cmd:option('-grad_clip', 5)
 cmd:option('-lr_decay_every', 5)
 cmd:option('-lr_decay_factor', 0.5)
 
 -- Output options
-cmd:option('-print_every', 1)
-cmd:option('-checkpoint_every', 80)
-cmd:option('-checkpoint_name', '/nas/doc/nn/cp')
+cmd:option('-print_every', 2)
+cmd:option('-checkpoint_every', 1500)
+cmd:option('-checkpoint_name', '/nas/soft/nn/cp')
 
 -- Benchmark options
 cmd:option('-speed_benchmark', 0)
 cmd:option('-memory_benchmark', 0)
 
 -- Backend options
-cmd:option('-gpu', -1)
+cmd:option('-gpu', 0)
 cmd:option('-gpu_backend', 'cuda')
 
 local opt = cmd:parse(arg)
@@ -68,7 +70,21 @@ else
    opt.wordvec_size=64
 end
 
-print(opt)
+local online=opt.online
+local outfile=opt.outfile
+
+if online then
+	opt.batch_size = 1
+	local fp = assert(hdf5.open(opt.input_h5), "Can't open file " .. opt.input_h5 )
+	opt.seq_length=fp:read('train'):dataspaceSize()[1]-1
+	print ("Online mode. Seq_length is set to ", opt.seq_length)
+	fp:close()
+	opt.lr_decay_factor=0.9
+	opt.learning_rate=1.0e-08
+	opt.lr_decay_every=20
+	
+end
+
 
 -- Set up GPU stuff
 local dtype = 'torch.FloatTensor'
@@ -117,14 +133,21 @@ if opt.init_from ~= '' then
     start_i = checkpoint.i
   end
   print('Loaded')
+
 else
   model = nn.LanguageModel(opt_clone):type(dtype)
   print('New model created')
 end
-if not start_i then
+
+print(opt)
+
+if not start_i and not online then
   io.write("Enter the iteration number: ")
   start_i = io.read()
+elseif online then
+  start_i = 1
 end
+
 local params, grad_params = model:getParameters()
 print('number of parameters in the model: ' .. params:nElement())
 print('grad_params:norm', grad_params:norm())
@@ -212,8 +235,9 @@ for i = start_i + 1, num_iterations do
 
     -- Maybe decay learning rate
     if epoch % opt.lr_decay_every == 0 then
---      model:resetStates()
+      model:resetStates()
       local old_lr = optim_config.learningRate
+	  opt.learning_rate = opt.learning_rate * opt.lr_decay_factor
       optim_config = {learningRate = old_lr * opt.lr_decay_factor}
       print('learningRate = ', optim_config.learningRate)
     end
@@ -236,14 +260,16 @@ for i = start_i + 1, num_iterations do
 
   -- Maybe save a checkpoint
   local check_every = opt.checkpoint_every
-  if (check_every > 0 and i % check_every == 0) or i == num_iterations or i % num_train == 0 then
+  if (check_every > 0 and i % check_every == 0) or i == num_iterations  or (i % num_train == 0 and not online) then
     -- Evaluate loss on the validation set. Note that we reset the state of
     -- the model; this might happen in the middle of an epoch, but that
     -- shouldn't cause too much trouble.
     val_loss = 0.1
     table.insert(val_loss_history, val_loss)
     table.insert(val_loss_history_it, i)
---    model:resetStates()
+	if online then
+--	    model:resetStates()
+	end
 --    model:training()
 
     -- First save a JSON checkpoint, excluding the model
@@ -256,19 +282,40 @@ for i = start_i + 1, num_iterations do
       memory_usage = memory_usage,
       i = i
     }
-    local filename = string.format('%s_%d.json', opt.checkpoint_name, i)
+	local filename = ""
+	if online then
+		if outfile then
+			filename = outfile .. "json"
+		else 
+			filename = opt.checkpoint_name .. "_online_2.t7.json"
+		end
+	else
+    		filename = string.format('%s_%d.json', opt.checkpoint_name, i)
+	end
     -- Make sure the output directory exists before we try to write it
     paths.mkdir(paths.dirname(filename))
     utils.write_json(filename, checkpoint)
 
     -- Now save a torch checkpoint with the model
     -- Cast the model to float before saving so it can be used on CPU
---    model:clearState()
-    model:float()
-    checkpoint.model = model
-    local filename = string.format('%s_%s_%d.t7', opt.checkpoint_name, opt.learning_rate, i)
+	--    model:clearState()
+	if online then
+		if outfile then		
+			filename = outfile
+		else
+			filename = opt.checkpoint_name .. "_online_2.t7"
+		end
+	else
+    	filename = string.format('%s_%s_%d.t7', opt.checkpoint_name, opt.learning_rate, i)
+	end
     paths.mkdir(paths.dirname(filename))
     print('Saving a checkpoint')
+--	if i == num_iterations then
+--		model:resetStates()
+--		model:clearState()
+--	end
+    model:float()
+    checkpoint.model = model
     local mytimer = torch.Timer()
     torch.save(filename, checkpoint)
     print ('Checkpoint = ',filename,'Time = ',mytimer:time().real)
