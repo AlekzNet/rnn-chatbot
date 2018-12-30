@@ -180,7 +180,7 @@ function LM:sample(kwargs)
     first_t = 1
   end
 
-  local non_cr = 0
+  local empty = 1
   local _, next_char = nil, nil
   local answer = {}
   for t = first_t, T do
@@ -194,16 +194,28 @@ function LM:sample(kwargs)
     end
     local current_char = self:decode_char(next_char)
 
-    if not (current_char == '\n') then 
-		non_cr = 1
-			table.insert(answer,current_char)
-    end
-    if current_char == '\n' and non_cr == 1  then 
+-- Is the string empty?	
+	if empty then
+-- Ignore punctuation, spaces and new-lines as the first char
+		if string.find(current_char, "[a-zA-Z0-9]") then 
+-- If the first letter is small, prepend with "... "
+			if string.find(current_char,"[a-z]") then
+				table.insert(answer,"... ")
+			end
+				table.insert(answer,current_char)	
+-- The string is not empty now			
+				empty = nil
+		end
+-- New line means end of the response
+	elseif current_char == '\n' then 
     	return table.concat(answer,"")
+	else
+		table.insert(answer,current_char)
     end
+
     scores = self:forward(next_char)
   end
-  return answer
+  return table.concat(answer,"")
 end
 
 
